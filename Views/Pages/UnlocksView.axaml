@@ -366,6 +366,7 @@
                     <TextBlock Classes="hint" TextWrapping="Wrap"
                                Text="Hold the free-roam time of day using the weather script. Restore returns to its previous time; active weather controls may keep the script paused." />
                     <WrapPanel>
+                        <Button Classes="primary" Content="Early morning" Margin="0,0,8,8" Command="{Binding SetEarlyMorningCommand}" IsEnabled="{Binding CanToggle}" />
                         <Button Classes="primary" Content="Day" Margin="0,0,8,8" Command="{Binding SetDayCommand}" IsEnabled="{Binding CanToggle}" />
                         <Button Classes="primary" Content="Evening" Margin="0,0,8,8" Command="{Binding SetEveningCommand}" IsEnabled="{Binding CanToggle}" />
                         <Button Classes="primary" Content="Night" Margin="0,0,8,8" Command="{Binding SetNightCommand}" IsEnabled="{Binding CanToggle}" />

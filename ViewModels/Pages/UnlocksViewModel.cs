@@ -403,6 +403,7 @@ public partial class UnlocksViewModel : PageViewModelBase
         SetStatus(ok, ok ? $"{label} selected." : error);
     }
 
+    [RelayCommand] private void SetEarlyMorning() => SetClock(6, "Early morning");
     [RelayCommand] private void SetDay() => SetClock(12, "Day");
     [RelayCommand] private void SetEvening() => SetClock(18, "Evening");
     [RelayCommand] private void SetNight() => SetClock(20, "Night");
