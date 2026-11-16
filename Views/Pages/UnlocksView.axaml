@@ -354,6 +354,8 @@
                     <WrapPanel>
                         <Button Classes="primary" Content="Precipitation" Margin="0,0,8,8" Command="{Binding SetPrecipitationCommand}" IsEnabled="{Binding CanToggle}" />
                         <Button Classes="primary" Content="Maximum precipitation" Margin="0,0,8,8" Command="{Binding SetMaximumPrecipitationCommand}" IsEnabled="{Binding CanToggle}" />
+                        <Button Classes="primary" Content="Maximum wind" Margin="0,0,8,8" Command="{Binding SetWindCommand}" IsEnabled="{Binding CanToggle}" />
+                        <Button Classes="primary" Content="Storm intensity" Margin="0,0,8,8" Command="{Binding SetStormCommand}" IsEnabled="{Binding CanToggle}" />
                         <Button Classes="ghost-sm" Content="Clear precipitation" Margin="0,0,8,8" Command="{Binding ClearPrecipitationCommand}" IsEnabled="{Binding CanToggle}" />
                     </WrapPanel>
                 </StackPanel>

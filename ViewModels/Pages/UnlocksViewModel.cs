@@ -392,6 +392,19 @@ public partial class UnlocksViewModel : PageViewModelBase
     [RelayCommand] private void SetPrecipitation() => ApplyPrecipitation(0.65f, "Precipitation");
     [RelayCommand] private void SetMaximumPrecipitation() => ApplyPrecipitation(1f, "Maximum precipitation intensity");
     [RelayCommand] private void ClearPrecipitation() => ApplyPrecipitation(0f, "Precipitation cleared");
+    [RelayCommand] private void SetWind() => ApplyWeatherPreset(false);
+    [RelayCommand] private void SetStorm() => ApplyWeatherPreset(true);
+
+    private void ApplyWeatherPreset(bool storm)
+    {
+        if (!CanToggle) { SetStatus(false, "FH6 is not running."); return; }
+        var state = _cheats.ReadWeather();
+        if (state is null) { SetStatus(false, "Weather state could not be read."); return; }
+        if (storm && !state.Storm.HasValue) { SetStatus(false, "Storm intensity is unavailable on this build."); return; }
+        var ok = _cheats.SetWeather(storm ? 1f : state.Rain, state.Wetness, state.Atmosphere, 1f, storm ? 1f : null, out var error);
+        if (ok) ReadWeather();
+        SetStatus(ok, ok ? (storm ? "Maximum storm and precipitation intensity selected." : "Maximum wind intensity selected.") : error);
+    }
 
     private void ApplyPrecipitation(float intensity, string label)
     {
@@ -405,7 +418,7 @@ public partial class UnlocksViewModel : PageViewModelBase
 
     [RelayCommand] private void SetEarlyMorning() => SetClock(6, "Early morning");
     [RelayCommand] private void SetDay() => SetClock(12, "Day");
-    [RelayCommand] private void SetEvening() => SetClock(18, "Evening");
+    [RelayCommand] private void SetEvening() => SetClock(16.5f, "Evening");
     [RelayCommand] private void SetNight() => SetClock(20, "Night");
 
     private void SetClock(float hour, string label)
