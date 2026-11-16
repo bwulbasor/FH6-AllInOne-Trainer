@@ -389,6 +389,20 @@ public partial class UnlocksViewModel : PageViewModelBase
         if (ok) ReadWeather();
     }
 
+    [RelayCommand] private void SetPrecipitation() => ApplyPrecipitation(0.65f, "Precipitation");
+    [RelayCommand] private void SetMaximumPrecipitation() => ApplyPrecipitation(1f, "Maximum precipitation intensity");
+    [RelayCommand] private void ClearPrecipitation() => ApplyPrecipitation(0f, "Precipitation cleared");
+
+    private void ApplyPrecipitation(float intensity, string label)
+    {
+        if (!CanToggle) { SetStatus(false, "FH6 is not running."); return; }
+        var state = _cheats.ReadWeather();
+        if (state is null) { SetStatus(false, "Weather state could not be read."); return; }
+        var ok = _cheats.SetWeather(intensity, state.Wetness, state.Atmosphere, state.Wind, null, out var error);
+        if (ok) ReadWeather();
+        SetStatus(ok, ok ? $"{label} selected." : error);
+    }
+
     [RelayCommand] private void SetDay() => SetClock(12, "Day");
     [RelayCommand] private void SetEvening() => SetClock(18, "Evening");
     [RelayCommand] private void SetNight() => SetClock(20, "Night");

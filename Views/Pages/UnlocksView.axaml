@@ -325,7 +325,7 @@
                 <StackPanel Spacing="10">
                     <TextBlock Text="WEATHER (EXPERIMENTAL)" Classes="section-header" />
                     <TextBlock Classes="hint" TextWrapping="Wrap"
-                               Text="Live weather intensity. Values are 0.0 (off) to 1.0 (max). Press Read to capture the current state, edit, then Apply. The game's dynamic weather may drift values back over time — press Apply again to re-force." />
+                               Text="Rain, wind and storm intensity range from 0.0 to 1.0. Press Read before editing. Fog and a full gale are not yet available; wetness and atmosphere are shown for reference." />
                     <TextBlock Text="{Binding CurrentWeatherText}" Classes="dim" />
                     <Grid ColumnDefinitions="110,*,Auto" ColumnSpacing="8">
                         <TextBlock Grid.Column="0" Text="Rain" VerticalAlignment="Center" FontSize="12" />
@@ -351,6 +351,11 @@
                     </Grid>
                     <Button Classes="primary" Content="Apply Weather" Padding="14,6" HorizontalAlignment="Left"
                             Command="{Binding ApplyWeatherCommand}" IsEnabled="{Binding CanToggle}" />
+                    <WrapPanel>
+                        <Button Classes="primary" Content="Precipitation" Margin="0,0,8,8" Command="{Binding SetPrecipitationCommand}" IsEnabled="{Binding CanToggle}" />
+                        <Button Classes="primary" Content="Maximum precipitation" Margin="0,0,8,8" Command="{Binding SetMaximumPrecipitationCommand}" IsEnabled="{Binding CanToggle}" />
+                        <Button Classes="ghost-sm" Content="Clear precipitation" Margin="0,0,8,8" Command="{Binding ClearPrecipitationCommand}" IsEnabled="{Binding CanToggle}" />
+                    </WrapPanel>
                 </StackPanel>
             </Border>
 

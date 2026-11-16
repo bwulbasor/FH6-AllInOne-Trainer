@@ -26,6 +26,8 @@ public sealed class WeatherChanger
     private int? _savedPid;
     private ulong[]? _savedAddresses;
     private byte[][]? _savedValues;
+    private ulong[]? _savedWindAddresses;
+    private byte[][]? _savedWindValues;
     private WeatherState? _lastDirectRead;
     private ulong _baselineScript;
     private int? _baselinePid;
@@ -179,11 +181,15 @@ public sealed class WeatherChanger
             error = "Weather values must be finite numbers.";
             return false;
         }
-        if (Math.Abs(wetness - state.Wetness) > 0.011f || Math.Abs(atmosphere - state.Atmosphere) > 0.011f || Math.Abs(wind - state.Wind) > 0.011f)
+        if (Math.Abs(wetness - state.Wetness) > 0.011f || Math.Abs(atmosphere - state.Atmosphere) > 0.011f)
         {
-            error = "On this build, rain and storm intensity are available. Press Read and leave wetness, atmosphere and wind unchanged.";
+            error = "On this build, rain, wind and storm intensity are available. Press Read and leave wetness and atmosphere unchanged.";
             return false;
         }
+        var changeWind = Math.Abs(wind - state.Wind) > 0.011f;
+        if (changeWind && !_engine.ReadBytesPublic(_engine.MainBase + 0x752118, 21).AsSpan().SequenceEqual(
+                new byte[] { 0x80, 0xbb, 0x2c, 1, 0, 0, 0, 0x74, 0x0c, 0x8b, 0x83, 0x30, 1, 0, 0, 0x89, 0x83, 0xd4, 0, 0, 0 }))
+        { error = "The wind control signature does not match this game build."; return false; }
         var script = _engine.ReadUInt64Public(manager + 0x1B0);
         if (script < 0x10000 || script > 0x0000_7FFF_FFFF_FFFF || _engine.ReadBytesPublic(script, 1).Length != 1)
         {
@@ -200,6 +206,10 @@ public sealed class WeatherChanger
             error = "The weather state could not be read completely.";
             return false;
         }
+        var windAddresses = new[] { manager + 0x130, manager + 0x12c, manager + 0xd4 };
+        var windOriginal = changeWind ? windAddresses.Select((address, index) => _engine.ReadBytesPublic(address, index == 1 ? 1 : 4)).ToArray() : null;
+        if (windOriginal != null && windOriginal.Where((bytes, index) => bytes.Length != (index == 1 ? 1 : 4)).Any())
+        { error = "The wind state could not be read completely."; return false; }
         try
         {
             var intensity = BitConverter.GetBytes(Clamp(rain));
@@ -216,6 +226,14 @@ public sealed class WeatherChanger
                 _engine.WriteBytesPublic(addresses[7], [0]);
                 _engine.WriteBytesPublic(addresses[8], stormIntensity);
             }
+            if (changeWind)
+            {
+                var windIntensity = BitConverter.GetBytes(Clamp(wind));
+                _engine.WriteBytesPublic(windAddresses[0], windIntensity);
+                _engine.WriteBytesPublic(windAddresses[1], [1]);
+                _engine.WriteBytesPublic(windAddresses[2], windIntensity);
+                if (_savedWindAddresses == null) { _savedWindAddresses = windAddresses; _savedWindValues = windOriginal; }
+            }
             if (_savedManager != manager || _savedPid != _engine.Pid)
             {
                 _savedManager = manager;
@@ -229,6 +247,9 @@ public sealed class WeatherChanger
         }
         catch (Exception ex)
         {
+            if (windOriginal != null)
+                for (var index = windAddresses.Length - 1; index >= 0; index--)
+                    try { _engine.WriteBytesPublic(windAddresses[index], windOriginal[index]); } catch { }
             for (var index = addresses.Length - 1; index >= 0; index--)
             {
                 try { _engine.WriteBytesPublic(addresses[index], original[index]); }
@@ -334,6 +355,9 @@ public sealed class WeatherChanger
                     if (_savedPid == _engine.Pid && _savedManager == manager && _savedAddresses != null && _savedValues != null)
                         for (var index = _savedAddresses.Length - 1; index >= 0; index--)
                             if (index != 4) TryRestore(_savedAddresses[index], _savedValues[index]);
+                    if (_savedPid == _engine.Pid && _savedManager == manager && _savedWindAddresses != null && _savedWindValues != null)
+                        for (var index = _savedWindAddresses.Length - 1; index >= 0; index--)
+                            TryRestore(_savedWindAddresses[index], _savedWindValues[index]);
                     if (_savedClockSample != null) TryRestore(_baselineScript + 0xb8, _savedClockSample);
                     TryRestore(_baselineScript, _baselineScriptPause);
                 }
@@ -344,6 +368,8 @@ public sealed class WeatherChanger
         _savedPid = null;
         _savedAddresses = null;
         _savedValues = null;
+        _savedWindAddresses = null;
+        _savedWindValues = null;
         _baselineScript = 0;
         _baselinePid = null;
         _baselineScriptPause = null;
