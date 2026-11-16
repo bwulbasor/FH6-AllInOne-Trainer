@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using FH6Mod.Cheats.RuntimeHook;
 using FH6Mod.Cheats.Season;
 using FH6Mod.Cheats.Sql;
@@ -16,11 +17,15 @@ public sealed class CheatService : IDisposable
     private readonly RuntimeHookEngine _engine = new();
     private readonly SqlExecutor _sql;
     private readonly SeasonChanger _season;
+    private readonly DirectSeasonChanger _directSeason;
     private readonly WeatherChanger _weather;
     private readonly XpCaller _xp;
     private readonly RewardCaller _reward;
     private readonly HashSet<RuntimeProfileFeature> _active = new();
     private int _lastAttachedPid;
+    private readonly object _attachLock = new();
+    private readonly Timer _autoAttachTimer;
+    private bool _disposed;
 
     public LogService LogSvc => _log;
     public string? LastError { get; private set; }
@@ -35,27 +40,46 @@ public sealed class CheatService : IDisposable
         _log = log;
         _sql = new SqlExecutor(_engine);
         _season = new SeasonChanger(_engine);
+        _directSeason = new DirectSeasonChanger(_engine);
         _weather = new WeatherChanger(_engine);
         _xp = new XpCaller(_engine);
         _reward = new RewardCaller(_engine);
         _engine.SetLogCallback(msg => _log.Info(msg));
         _game.StatusChanged += OnGameStatusChanged;
+        if (_game.IsAttached) EnsureAttached();
+        _autoAttachTimer = new Timer(_ =>
+        {
+            try { if (_game.IsAttached && !_engine.IsAttached) EnsureAttached(); }
+            catch (Exception ex) { _log.Error($"Automatic attachment failed: {ex.Message}"); }
+        }, null, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(2));
     }
 
     public void Dispose()
     {
+        _autoAttachTimer.Dispose();
         _game.StatusChanged -= OnGameStatusChanged;
-        _engine.Dispose();
+        lock (_attachLock)
+        {
+            _disposed = true;
+            _weather.Reset();
+            _engine.Dispose();
+        }
     }
 
     private void OnGameStatusChanged()
     {
+        if (_game.IsAttached)
+        {
+            EnsureAttached();
+            return;
+        }
         if (!_game.IsAttached && _engine.IsAttached)
         {
             _log.Info("Game exited while attached — cleaning up hooks");
             _active.Clear();
             _sql.Reset();
             _season.Reset();
+            _directSeason.Reset();
             _weather.Reset();
             try { _engine.Detach(); }
             catch (Exception ex) { LastError = $"Detach on game-exit failed: {ex.Message}"; _log.Error($"Detach failed: {ex.Message}"); }
@@ -83,6 +107,11 @@ public sealed class CheatService : IDisposable
 
     public bool EnsureAttached()
     {
+        lock (_attachLock) return !_disposed && EnsureAttachedCore();
+    }
+
+    private bool EnsureAttachedCore()
+    {
         if (!_game.IsAttached)
         {
             LastError = "Forza Horizon 6 is not running.";
@@ -94,6 +123,7 @@ public sealed class CheatService : IDisposable
         // The engine self-cleans stale state from a previous game process inside
         // Attach(); here we only drop our own toggle bookkeeping when the PID changes.
         var previousPid = _lastAttachedPid;
+        if (previousPid != _game.Pid) _weather.Reset();
 
         _log.Info($"Attaching to PID {_game.Pid}...");
         if (!_engine.Attach(_game.Pid!.Value))
@@ -207,6 +237,7 @@ public sealed class CheatService : IDisposable
     public int GetCurrentSeason()
     {
         if (!_engine.IsAttached) return -1;
+        if (_weather.UsesDirectWeather) return _directSeason.GetCurrent();
         if (!_season.IsResolved)
         {
             _engine.EnsureSeasonHook(out _);
@@ -220,6 +251,10 @@ public sealed class CheatService : IDisposable
         error = null;
         if (!EnsureAttached()) { error = "Not attached."; return false; }
         if (season < 0 || season > 3) { error = "Invalid season (0-3)."; return false; }
+        if (_weather.UsesDirectWeather)
+        {
+            return _directSeason.SetSeason(season, out error);
+        }
 
         // Season hook is strictly opt-in: installed here, only when the user actually
         // invokes a Season feature. Never as a side effect of enabling profile cheats.
@@ -283,7 +318,7 @@ public sealed class CheatService : IDisposable
     public WeatherChanger.WeatherState? ReadWeather()
     {
         if (!EnsureAttached()) return null;
-        if (!_weather.IsResolved && !_engine.EnsureWeatherHook(out var hookErr))
+        if (!_weather.UsesDirectWeather && !_weather.IsResolved && !_engine.EnsureWeatherHook(out var hookErr))
         {
             _log.Error($"Weather hook: {hookErr}");
             return null;
@@ -291,23 +326,37 @@ public sealed class CheatService : IDisposable
         return _weather.ReadState();
     }
 
-    public bool SetWeather(float rain, float wetness, float atmosphere, float wind, out string? error)
+    public bool SetWeather(float rain, float wetness, float atmosphere, float wind, float? storm, out string? error)
     {
         error = null;
         if (!EnsureAttached()) { error = "Not attached."; return false; }
-        if (!_weather.IsResolved && !_engine.EnsureWeatherHook(out var hookErr))
+        if (!_weather.UsesDirectWeather && !_weather.IsResolved && !_engine.EnsureWeatherHook(out var hookErr))
         {
             error = $"Weather hook: {hookErr}";
             _log.Error(error);
             return false;
         }
-        if (!_weather.SetState(rain, wetness, atmosphere, wind, out var setErr))
+        if (!_weather.SetState(rain, wetness, atmosphere, wind, storm, out var setErr))
         {
-            error = setErr;
+            error = setErr ?? "Could not apply weather.";
             _log.Error(error);
             return false;
         }
         LastError = null;
         return true;
+    }
+
+    public bool SetTimeOfDay(float hours, out string? error)
+    {
+        error = null;
+        if (!EnsureAttached()) { error = "Not attached."; return false; }
+        return _weather.SetTimeOfDay(hours, out error);
+    }
+
+    public bool RestoreTimeOfDay(out string? error)
+    {
+        error = null;
+        if (!EnsureAttached()) { error = "Not attached."; return false; }
+        return _weather.RestoreTimeOfDay(out error);
     }
 }

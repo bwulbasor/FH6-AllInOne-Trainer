@@ -10,7 +10,7 @@
         MinWidth="720" MinHeight="500"
         x:Class="FH6Mod.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
-        Title="FH6 All-in-One Trainer"
+        Title="FH6 All-in-One Trainer — Experimental Seasons, Weather and Time"
         Background="{DynamicResource Surface0Brush}"
         WindowStartupLocation="CenterScreen"
         Icon="/Assets/logo.png">

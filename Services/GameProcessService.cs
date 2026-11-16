@@ -53,12 +53,20 @@ public sealed class GameProcessService : IDisposable
         try
         {
             var was = IsAttached;
-            if (_process is { HasExited: false })
+            var previousPid = Pid;
+            if (_process is { HasExited: false } && _process.MainWindowHandle != IntPtr.Zero)
                 return;
 
-            _process = SelectGameProcess();
+            var selected = SelectGameProcess();
+            if (selected != null && selected.Id == previousPid)
+            {
+                selected.Dispose();
+                return;
+            }
+            _process?.Dispose();
+            _process = selected;
             var nowAttached = IsAttached;
-            if (was != nowAttached)
+            if (was != nowAttached || previousPid != Pid)
             {
                 if (nowAttached)
                 {
@@ -83,12 +91,14 @@ public sealed class GameProcessService : IDisposable
     /// </summary>
     private static Process? SelectGameProcess()
     {
-        foreach (var name in new[] { "ForzaHorizon6", "forzahorizon6" })
-        {
-            var found = Process.GetProcessesByName(name).FirstOrDefault();
-            if (found is not null) return found;
-        }
-        return null;
+        var processes = Process.GetProcessesByName(ProcessName);
+        // A launcher can keep a same-name, windowless process alive. Wait for the
+        // actual game window rather than attaching to that helper process.
+        var selected = processes.Where(process => process.MainWindowHandle != IntPtr.Zero)
+            .OrderByDescending(process => process.StartTime).FirstOrDefault();
+        foreach (var process in processes)
+            if (process != selected) process.Dispose();
+        return selected;
     }
 
     public List<string> DetectConflictingTrainers()

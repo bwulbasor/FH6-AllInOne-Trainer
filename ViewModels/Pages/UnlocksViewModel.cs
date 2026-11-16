@@ -67,6 +67,8 @@ public partial class UnlocksViewModel : PageViewModelBase
     [ObservableProperty] private string _wetnessText = "0.00";
     [ObservableProperty] private string _atmosphereText = "0.00";
     [ObservableProperty] private string _windText = "0.00";
+    [ObservableProperty] private string _stormText = "0.00";
+    [ObservableProperty] private bool _stormAvailable;
 
     // --- XP ---
     [ObservableProperty] private string _xpAmountText = "100000";
@@ -307,19 +309,24 @@ public partial class UnlocksViewModel : PageViewModelBase
 
     // ===== Season =====
     [RelayCommand]
-    private void SetSeasonToSpring() { SetSeasonValue(0, "Spring"); }
+    private async System.Threading.Tasks.Task SetSeasonToSpring() { await SetSeasonValue(0, "Spring"); }
     [RelayCommand]
-    private void SetSeasonToSummer() { SetSeasonValue(1, "Summer"); }
+    private async System.Threading.Tasks.Task SetSeasonToSummer() { await SetSeasonValue(1, "Summer"); }
     [RelayCommand]
-    private void SetSeasonToAutumn() { SetSeasonValue(2, "Autumn"); }
+    private async System.Threading.Tasks.Task SetSeasonToAutumn() { await SetSeasonValue(2, "Autumn"); }
     [RelayCommand]
-    private void SetSeasonToWinter() { SetSeasonValue(3, "Winter"); }
+    private async System.Threading.Tasks.Task SetSeasonToWinter() { await SetSeasonValue(3, "Winter"); }
 
-    private void SetSeasonValue(int season, string label)
+    private async System.Threading.Tasks.Task SetSeasonValue(int season, string label)
     {
-        var ok = _cheats.SetSeason(season, out var err);
-        SetStatus(ok, ok ? $"Season set to {label}. Fast-travel or load a race to refresh visuals." : err);
-        if (ok) RefreshSeason();
+        SetStatus(true, $"Requesting {label}; locating the game state may take a moment.");
+        var result = await System.Threading.Tasks.Task.Run(() =>
+        {
+            var ok = _cheats.SetSeason(season, out var err);
+            return (ok, err);
+        });
+        SetStatus(result.ok, result.ok ? $"Season set to {label}. Fast-travel if the scenery has not refreshed." : result.err);
+        if (result.ok) RefreshSeason();
     }
 
     private void RefreshSeason()
@@ -360,10 +367,13 @@ public partial class UnlocksViewModel : PageViewModelBase
             return;
         }
         CurrentWeatherText = $"Rain {s.Rain:0.00} · Wetness {s.Wetness:0.00} · Atmosphere {s.Atmosphere:0.00} · Wind {s.Wind:0.00}";
+        if (s.Storm.HasValue) CurrentWeatherText += $" · Storm {s.Storm.Value:0.00}";
         RainText = s.Rain.ToString("0.00", CultureInfo.InvariantCulture);
         WetnessText = s.Wetness.ToString("0.00", CultureInfo.InvariantCulture);
         AtmosphereText = s.Atmosphere.ToString("0.00", CultureInfo.InvariantCulture);
         WindText = s.Wind.ToString("0.00", CultureInfo.InvariantCulture);
+        StormAvailable = s.Storm.HasValue;
+        if (s.Storm.HasValue) StormText = s.Storm.Value.ToString("0.00", CultureInfo.InvariantCulture);
         SetStatus(true, "Weather state read.");
     }
 
@@ -373,9 +383,27 @@ public partial class UnlocksViewModel : PageViewModelBase
         if (!CanToggle) { SetStatus(false, "FH6 is not running."); return; }
         var ok = _cheats.SetWeather(
             ParseF(RainText, 0f), ParseF(WetnessText, 0f),
-            ParseF(AtmosphereText, 0f), ParseF(WindText, 0f), out var err);
+            ParseF(AtmosphereText, 0f), ParseF(WindText, 0f),
+            StormAvailable ? ParseF(StormText, 0f) : null, out var err);
         SetStatus(ok, ok ? "Weather applied." : err);
         if (ok) ReadWeather();
+    }
+
+    [RelayCommand] private void SetDay() => SetClock(12, "Day");
+    [RelayCommand] private void SetEvening() => SetClock(18, "Evening");
+    [RelayCommand] private void SetNight() => SetClock(20, "Night");
+
+    private void SetClock(float hour, string label)
+    {
+        var ok = _cheats.SetTimeOfDay(hour, out var error);
+        SetStatus(ok, ok ? $"{label} selected." : error);
+    }
+
+    [RelayCommand]
+    private void RestoreClock()
+    {
+        var ok = _cheats.RestoreTimeOfDay(out var error);
+        SetStatus(ok, ok ? "Scripted time restored. Active weather controls may still hold the weather script." : error);
     }
 
     // ===== XP grant =====

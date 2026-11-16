@@ -345,8 +345,27 @@
                         <TextBlock Grid.Column="0" Text="Wind" VerticalAlignment="Center" FontSize="12" />
                         <TextBox Grid.Column="1" Text="{Binding WindText}" Width="60" HorizontalAlignment="Left" />
                     </Grid>
+                    <Grid ColumnDefinitions="110,*" ColumnSpacing="8">
+                        <TextBlock Grid.Column="0" Text="Storm" VerticalAlignment="Center" FontSize="12" />
+                        <TextBox Grid.Column="1" Text="{Binding StormText}" Width="60" HorizontalAlignment="Left" IsEnabled="{Binding StormAvailable}" />
+                    </Grid>
                     <Button Classes="primary" Content="Apply Weather" Padding="14,6" HorizontalAlignment="Left"
                             Command="{Binding ApplyWeatherCommand}" IsEnabled="{Binding CanToggle}" />
+                </StackPanel>
+            </Border>
+
+            <!-- Time of day card -->
+            <Border Classes="card">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="TIME OF DAY (EXPERIMENTAL)" Classes="section-header" />
+                    <TextBlock Classes="hint" TextWrapping="Wrap"
+                               Text="Hold the free-roam time of day using the weather script. Restore returns to its previous time; active weather controls may keep the script paused." />
+                    <WrapPanel>
+                        <Button Classes="primary" Content="Day" Margin="0,0,8,8" Command="{Binding SetDayCommand}" IsEnabled="{Binding CanToggle}" />
+                        <Button Classes="primary" Content="Evening" Margin="0,0,8,8" Command="{Binding SetEveningCommand}" IsEnabled="{Binding CanToggle}" />
+                        <Button Classes="primary" Content="Night" Margin="0,0,8,8" Command="{Binding SetNightCommand}" IsEnabled="{Binding CanToggle}" />
+                        <Button Classes="ghost-sm" Content="Restore" Margin="0,0,8,8" Command="{Binding RestoreClockCommand}" IsEnabled="{Binding CanToggle}" />
+                    </WrapPanel>
                 </StackPanel>
             </Border>
 
